@@ -1,7 +1,8 @@
 taperratio = .8; //the reduced base thickness
 
-//translate([30,0,0])taperSnapArm(length = 10, lzoom = 1, cantWidth = 4, headL = 6, cantAngle = -10,headHeight = 4, mask = 0, d = 2, res = 3);
-//translate([60,0,0])taperSnapArm(length = 10, lzoom = 1, cantWidth = 4, headL = 6, cantAngle = -10,headHeight = 4, mask = 0.2, d = 2);
+translate([30,0,0])taperSnapArm(length = 10, lzoom = 1, cantWidth = 4, headL = 6, cantAngle = -10,headHeight = 4, mask = 0, d = 2, res = 3);
+translate([60,0,0])taperSnapArm(length = 10, lzoom = 1, cantWidth = 4, headL = 6, cantAngle = -10,headHeight = 4, mask = 0.2, d = 2);
+translate([-30,0,0])doubleTaperSnapArm(length = 10, lzoom = 1, cantWidth = 2, headL = 6, cantAngle = 0,headHeight = 4, mask = 0.0, d = 2,width = 10);
 translate([0,0,0])beltSideSnap(length = 10, lzoom = 1, cantWidth = 2, headL = 6, cantAngle = 0,headHeight = 4, mask = 0.0, d = 2,width = 10);
 translate([0,22,0])beltSideSnap(length = 10, lzoom = 1, cantWidth = 2, headL = 6, cantAngle = 0,headHeight = 4, mask = 0.2, d = 2,width = 10);
 
@@ -61,28 +62,28 @@ function cantCheckButton(b,h) = (b < 0)? 0  : (b > h)?h:b;
 let( hh = cantCheckButton(button,head))
 
   [ 
-    (mask >  0)?[0,0]                :[0,0],
-    (mask >  0)?[h+mask,0]          :[h,0],
-    (mask >  0)?[h+mask,l-mask]:[h,l],
-    (mask >  0)?[h+y+mask,l*(1+sin(angle))-mask]  :[h+y,l*(1+sin(angle))],
-  if(mask >  0) [h+y+mask,l+hh+mask]    
+    (mask >  0)?[min(0,h-y-mask),0]                :[0,0], //0, start
+    (mask >  0)?[h+y+mask,0]                       :[h,0], //1  
+    (mask >  0)?[h+mask,l/2]                       :[h,l/2], //2 tapering for head insertion
+    (mask >  0)?[h+mask,l-mask]                    :[h,l],   //3 head start
+    (mask >  0)?[h+y+2*mask,l+y*tan(angle)-mask] :[h+y,l+y*tan(angle)], // 4 head cant low
+  if(mask >  0) [h+y+2*mask,l+hh+mask]    
 else if(smooth >0) each(roundPoint2D([h+y,l+hh],rad=y/10, res = 1*smooth,a0 = 20, a1 = 30, left = false)) 
-  else [h+y,l+hh],
+  else                                              [h+y,l+hh], //5 head cant up
   //(mask >  0)?[h+y+mask,l+hh+mask]    :(smooth >0)? each(roundPoint2D([h+y,l+hh],rad=30, res = smooth,above = true, left = false)):[h+y,l+hh],
-  (mask >  0)?[0,l+head]     :[h/2,l+head],
-  (mask >  0)?[0,l+head]     :[h/2,l],
+  (mask >  0)?[min(0,h-y-mask),l+head]             :[h/2,l+head], //6 top point
+  (mask >  0)?[min(0,h-y-mask),l+head]             :[h/2,l], //7 head end
   ];
   function taperArmHeadPoly(l, y, lz = 1, angle, button  =0, head,  eps =eps, smooth =0, mask = 0) = 
   let( h = lz*hForTaperArm(y,l, eps = eps))
   let( hh = cantCheckButton(button,head))
   let( d = (mask == 0)?min(head/4, y/4): 0)
   [ 
-    [h,l+d],
-    [h+y-d,(l)*(1+sin(angle))+1.5*d],
+    [h/2+d,l+d],
+    [h+y-d,l+y*tan(angle)+d], // 4 head cant low
     if(smooth >0) each(roundPoint2D([h+y-d,l+hh-d],rad=y/10, res = 1*smooth,a0 = 20, a1 = 30, left = false)) 
   else [h+y-d,l+hh-d],
-  [h/2+d,l+head-d],
-  [h/2+d,l+d+1.5*d*tan(angle)],//ehm bad at geometry.. why 1.5 *??
+  [h/2+d,l+head-(y+h/2)*d/(y-d)],
   ];
 function flatArray(a)= [
   if(len(a) > 2) each(a) else a];
@@ -181,24 +182,28 @@ module taperSnapArm(length = 10, lzoom = 1, cantWidth = 4, headL = 6, cantAngle 
   exth = (mask >0)? d+2*mask : d; 
   endangle = (mask >0)?90-atan((length+headL)/cantWidth): 1;
   h = lzoom*hForTaperArm(cantWidth,length, eps = eps);
+
+
+
+//  echo("l = ",length, " y  = ",cantWidth,"  angle = ",cantAngle," tan,",tan(cantAngle)," dy = ",(cantWidth*tan(cantAngle))," l-dy = ",(length+cantWidth*tan(cantAngle))," val = ",(length+cantWidth*tan(cantAngle)-mask));
+wd = min(headHeight/4, cantWidth/4);
   data = taperArmPoly(l=length, y=cantWidth, lz = lzoom, angle=cantAngle, button  =headHeight, head=headL, mask = mask, eps =eps, smooth = res);
-  echo("alpha = ",endangle, " res  = ",res,"  data = ",data);
+  //echo("alpha = ",endangle, " res  = ",res,"  data = ",data);
   headdata = taperArmHeadPoly(l=length, y=cantWidth, lz = lzoom, angle=cantAngle, button  =headHeight, head=headL, eps =eps, smooth = res);
   translate([cantWidth,0,-exth/2])
     linear_extrude(height = exth)
     {
 
-      for(alpha = [0:endangle/res: endangle]) rotate([0,0,alpha])
-      {
-if(mask ==0)
-        difference()
-        {
-          polygon( data );
-          polygon( headdata );
-        }
-else polygon(data);
-      }
-
+     //for(alpha = [0:endangle/res: endangle]) rotate([0,0,alpha])
+     //{
+        if(mask ==0)
+          difference()
+          {
+            polygon( data );
+            polygon( headdata );
+          }
+        else polygon(data);
+      //}
     }
 }// module cantilever(baseThick = 2, headThick = 3, cantL = 4, headL = 2, ratio = taperratio, mask = 0)
 
